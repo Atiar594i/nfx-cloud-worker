@@ -1,0 +1,76 @@
+name: NFX 24/7 Cloud Worker (WA Service & OTP Poller)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '*/20 * * * *'
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: nfx-24-7-cloud-worker
+  cancel-in-progress: false
+
+jobs:
+  cloud-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      TGCLOUD_TOKEN: ${{ secrets.TGCLOUD_APP_TOKEN }}
+      MAX_RUN_MINUTES: "330"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install WhatsApp Microservice Dependencies
+        run: |
+          cd wa_service
+          npm install --no-audit --no-fund
+
+      - name: Install Cloudflare Tunnel (cloudflared)
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+          chmod +x /usr/local/bin/cloudflared
+
+      - name: Restore WhatsApp Sessions from Cloud DB
+        run: |
+          node wa_service/cloud_sync.js pull
+
+      - name: Start WhatsApp Service, HTTPS Tunnel & 24/7 OTP Poller
+        run: |
+          node wa_service/server.js > wa_server.log 2>&1 &
+          for i in $(seq 1 15); do
+            if curl -fsS http://127.0.0.1:5055/health >/dev/null 2>&1; then
+              echo "WhatsApp server online on port 5055"
+              break
+            fi
+            sleep 1
+          done
+
+          cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5055 > tunnel.log 2>&1 &
+          for i in $(seq 1 20); do
+            if grep -qE "https://[a-zA-Z0-9-]+\.trycloudflare\.com" tunnel.log 2>/dev/null; then
+              echo "Cloudflare tunnel established"
+              break
+            fi
+            sleep 1
+          done
+
+          node wa_service/cloud_sync.js daemon tunnel.log
+
+      - name: Re-trigger Next 24/7 Worker Cycle
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node wa_service/cloud_sync.js push || true
+          gh workflow run cloud_worker.yml || true
