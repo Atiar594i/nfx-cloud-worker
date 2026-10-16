@@ -1,0 +1,8 @@
+{
+  " name\: \nfx-cloud-worker\,
+ \version\: \1.0.0\,
+ \main\: \wa_service/cloud_poller.js\,
+ \scripts\: {
+ \start\: \node wa_service/cloud_poller.js\
+ }
+}
