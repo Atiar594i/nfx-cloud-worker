@@ -1051,7 +1051,7 @@ async function main() {
 
   const domainLastFetch = new Map();
 
-  const RENDER_HEALTH_URL = process.env.RENDER_HEALTH_URL || 'https://otp-fast-engine.onrender.com';
+  const RENDER_HEALTH_URL = process.env.RENDER_HEALTH_URL || 'https://otp-fast-engine-yavi.onrender.com';
   let isStandby = false;
 
   async function checkRenderCloudStatus() {
@@ -1213,7 +1213,7 @@ server.listen(PORT, '0.0.0.0', () => {
 });
 
 // Self-keepalive: Ping public URL every 10 minutes to prevent Render free tier sleep
-const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://otp-fast-engine.onrender.com';
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://otp-fast-engine-yavi.onrender.com';
 setInterval(async () => {
   try {
     const res = await fetch(RENDER_EXTERNAL_URL);
